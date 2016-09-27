@@ -2,13 +2,11 @@ from __future__ import unicode_literals
 
 import logging
 
+from algoliasearch import algoliasearch
 from django.conf import settings
-from django.db.models.signals import post_save, pre_delete
-
 from django.contrib.algoliasearch.models import AlgoliaIndex
 from django.contrib.algoliasearch.version import VERSION
-
-from algoliasearch import algoliasearch
+from django.db.models.signals import post_save, pre_delete, m2m_changed
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +63,7 @@ class AlgoliaEngine(object):
         if self.auto_indexing:
             # Connect to the signalling framework.
             post_save.connect(self.__post_save_receiver, model)
+            m2m_changed.connect(self.__m2m_changed_receiver, model)
             pre_delete.connect(self.__pre_delete_receiver, model)
             logger.info('REGISTER %s', model)
 
@@ -84,6 +83,7 @@ class AlgoliaEngine(object):
         if self.auto_indexing:
             # Disconnect fron the signalling framework.
             post_save.disconnect(self.__post_save_receiver, model)
+            m2m_changed.disconnect(self.__m2m_changed_receiver, model)
             pre_delete.disconnect(self.__pre_delete_receiver, model)
             logger.info('UNREGISTER %s', model)
 
@@ -125,10 +125,16 @@ class AlgoliaEngine(object):
         logger.debug('RECEIVE post_save FOR %s', instance.__class__)
         self.update_obj_index(instance)
 
+    def __m2m_changed_receiver(self, instance, **kwargs):
+        '''Signal handler for when a registered model's relationship has been changed'''
+        logger.debug('RECEIVE post_save FOR %s', instance.__class__)
+        self.update_obj_index(instance)
+
     def __pre_delete_receiver(self, instance, **kwargs):
         '''Signal handler for when a registered model has been deleted.'''
         logger.debug('RECEIVE pre_delete FOR %s', instance.__class__)
         self.delete_obj_index(instance)
+
 
 # Algolia engine
 algolia_engine = AlgoliaEngine()
